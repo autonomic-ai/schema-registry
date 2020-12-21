@@ -17,6 +17,6 @@
 # Unauthorized copy of this file, via any medium is strictly prohibited.
 # ______________________________________________________________________________
 ###
-# ./mvnw versions:set -DnewVersion=$FINAL_OR_BRANCH_SNAPSHOT_VERSION
+./mvnw versions:set -DnewVersion=$FINAL_OR_BRANCH_SNAPSHOT_VERSION
 ./mvnw -version
-./mvnw deploy
+./mvnw deploy -DskipTests
