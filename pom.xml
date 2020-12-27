@@ -13,6 +13,7 @@
     <artifactId>kafka-schema-registry-parent</artifactId>
     <packaging>pom</packaging>
     <name>kafka-schema-registry-parent</name>
+    <version>LOCAL-SNAPSHOT</version>
     <organization>
         <name>Confluent, Inc.</name>
         <url>http://confluent.io</url>
@@ -299,6 +300,13 @@
                 <artifactId>jaxws-api</artifactId>
                 <version>2.3.0</version>
             </dependency>
+
+            <!-- Autonomic.ai - Add explicit version of rest-utils -->
+            <dependency>
+                <groupId>io.confluent</groupId>
+                <artifactId>rest-utils</artifactId>
+                <version>${confluent.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -357,6 +365,48 @@
                         </execution>
                     </executions>
                 </plugin>
+
+                <!-- Autonomic specific plugin -->
+                <plugin>
+                    <groupId>com.google.cloud.tools</groupId>
+                    <artifactId>jib-maven-plugin</artifactId>
+                    <version>2.5.2</version>
+                    <configuration>
+                      <outputPaths>
+                        <tar>${session.executionRootDirectory}/../docker_image/${docker.image-name}.tar</tar>
+                      </outputPaths>
+                      <from>
+                        <image>${docker.pull.ecr.hostname}/au/java:11${docker.debug-tag-suffix}-${docker.base-image-version}</image>
+                        <credHelper>ecr-login</credHelper>
+                        <auth combine.self="override"></auth>
+                      </from>
+                      <container>
+                        <workingDirectory>/home/au</workingDirectory>
+                        <user>au:au</user>
+                        <labels>
+                          <source.sha>${git.commit.id}</source.sha>
+                          <source.repo>${git.remote.origin.url}</source.repo>
+                          <maintainer>${docker.image-maintainer}</maintainer>
+                        </labels>
+                      </container>
+                    </configuration>
+                    <executions>
+                      <execution>
+                        <id>imageTar</id>
+                        <goals>
+                          <goal>buildTar</goal>
+                        </goals>
+                        <phase>deploy</phase>
+                      </execution>
+                      <execution>
+                        <id>image</id>
+                        <goals>
+                          <goal>build</goal>
+                        </goals>
+                        <phase>none</phase>
+                      </execution>
+                    </executions>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -396,7 +446,136 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Autonomic specific plugin -->
+            <!--
+            <plugin>
+                <groupId>org.jfrog.buildinfo</groupId>
+                <artifactId>artifactory-maven-plugin</artifactId>
+                <version>2.6.1</version>
+                <executions>
+                  <execution>
+                    <id>build-info</id>
+                    <goals>
+                      <goal>publish</goal>
+                    </goals>
+                    <configuration>
+                      <publisher>
+                        <contextUrl>https://autonomic.jfrog.io/autonomic</contextUrl>
+                        <repoKey>plugins-release-local</repoKey>
+                        <snapshotRepoKey>plugins-snapshot-local</snapshotRepoKey>
+                        <username>${env.ARTIFACT_REPO_USERNAME}</username>
+                        <password>${env.ARTIFACT_REPO_PASSWORD}</password>
+                      </publisher>
+                      <deployProperties>
+                        <groupId>${project.groupId}</groupId>
+                        <artifactId>${project.artifactId}</artifactId>
+                        <version>${project.version}</version>
+                      </deployProperties>
+                    </configuration>
+                  </execution>
+                </executions>
+            </plugin>
+            -->
+            <!-- Autonomic.ai - Following taken from com.autonomic:au-parent pom.xml
+                FIXME : Should we take the one from com.autonomic:au-policy pom.xml
+            -->
+            <!--
+              ~ https://www.mojohaus.org/versions-maven-plugin/index.html
+              ~ check for direct dependency version updates
+            -->
+            <plugin>
+              <groupId>org.codehaus.mojo</groupId>
+              <artifactId>versions-maven-plugin</artifactId>
+              <version>2.8.1</version>
+              <executions>
+                <execution>
+                  <id>display-parent-updates</id>
+                  <goals>
+                    <goal>display-parent-updates</goal>
+                  </goals>
+                  <phase>validate</phase>
+                </execution>
+                <execution>
+                  <id>display-dependency-updates</id>
+                  <goals>
+                    <goal>display-dependency-updates</goal>
+                  </goals>
+                  <phase>validate</phase>
+                  <configuration>
+                    <!-- only checking the dependencies section of the project -->
+                    <processDependencies>true</processDependencies>
+                    <processDependencyManagement>false</processDependencyManagement>
+                    <processPluginDependencies>false</processPluginDependencies>
+                    <processPluginDependenciesInPluginManagement>false</processPluginDependenciesInPluginManagement>
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
         </plugins>
 
     </build>
+
+    <profiles>
+      <profile>
+        <id>north-america</id>
+        <activation>
+          <property>
+            <name>env.ARTIFACT_REPO_LOCATION</name>
+            <value>na</value>
+          </property>
+        </activation>
+        <properties>
+          <artifactory.repoKey>libs-release-dev</artifactory.repoKey>
+          <artifactory.snapshotRepoKey>libs-snapshot-dev</artifactory.snapshotRepoKey>
+          <artifactory.excludePatterns>*-exec.jar</artifactory.excludePatterns>
+          <docker.pull.hostname>autonomic-docker.jfrog.io</docker.pull.hostname>
+          <docker.pull.ecr.hostname>422443434606.dkr.ecr.us-west-2.amazonaws.com</docker.pull.ecr.hostname>
+          <jib.docker.hostname>autonomic-docker-dev.jfrog.io</jib.docker.hostname>
+          <docker.hostname>autonomic-docker-dev.jfrog.io</docker.hostname>
+          <sonar.host.url>${env.SONAR_URL}</sonar.host.url>
+          <dependency-analyzer.internal.url>${env.DEPENDENCY_ANALYZER_URL}</dependency-analyzer.internal.url>
+        </properties>
+        <build>
+          <plugins>
+            <plugin>
+              <groupId>org.jfrog.buildinfo</groupId>
+              <artifactId>artifactory-maven-plugin</artifactId>
+              <version>2.6.1</version>
+              <executions>
+                <execution>
+                  <id>build-info</id>
+                  <goals>
+                    <goal>publish</goal>
+                  </goals>
+                  <configuration>
+                    <publisher>
+                      <contextUrl>https://autonomic.jfrog.io/autonomic</contextUrl>
+                      <repoKey>${artifactory.repoKey}</repoKey>
+                      <snapshotRepoKey>${artifactory.snapshotRepoKey}</snapshotRepoKey>
+                      <username>${env.ARTIFACT_REPO_USERNAME}</username>
+                      <password>${env.ARTIFACT_REPO_PASSWORD}</password>
+                      <excludePatterns>${artifactory.excludePatterns}</excludePatterns>
+                      <filterExcludedArtifactsFromBuild>true</filterExcludedArtifactsFromBuild>
+                      <publishBuildInfo>false</publishBuildInfo>
+                    </publisher>
+                    <deployProperties>
+                      <groupId>${project.groupId}</groupId>
+                      <artifactId>${project.artifactId}</artifactId>
+                      <version>${project.version}</version>
+                    </deployProperties>
+                    <buildInfo>
+                      <buildNumber>${build-number}</buildNumber>
+                    </buildInfo>
+                    <licenses>
+                      <autoDiscover>true</autoDiscover>
+                    </licenses>
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </build>
+      </profile>
+    </profiles>
 </project>
